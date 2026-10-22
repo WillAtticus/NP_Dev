@@ -1,0 +1,14 @@
+{
+  "name": "neuropulse-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Windows desktop shell for the NeuroPulse research application",
+  "main": "main.cjs",
+  "scripts": {
+    "build:ui": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/build_desktop.ps1",
+    "start": "npm run build:ui && electron . --disable-gpu"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0"
+  }
+}

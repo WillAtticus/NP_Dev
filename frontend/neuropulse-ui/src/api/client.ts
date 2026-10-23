@@ -32,6 +32,7 @@ export type PatientRecord = {
   full_name: string
   date_of_birth: string | null
   chromosome_marker: 'X' | 'Y'
+  reported_sex?: 'female' | 'male' | null
   age_band: string
   medical_history: string | null
   family_history: string | null
@@ -97,13 +98,16 @@ export const getPatients = () => api.get<PatientRecord[]>('/patients')
 export const createPatient = (payload: {
   full_name: string
   date_of_birth?: string
-  chromosome_marker: 'X' | 'Y'
+  reported_sex?: 'female' | 'male'
+  chromosome_marker?: 'X' | 'Y'
   medical_history?: string
   family_history?: string
   diet?: 'vegetarian' | 'omnivore'
 }) => api.post<PatientRecord>('/patients', payload)
 export const lookupPatient = (patientCode: string) =>
   api.get<PatientLookup>(`/patients/lookup/${encodeURIComponent(patientCode)}`)
+export const exportPatientRecord = (patientCode: string) =>
+  api.get(`/patients/lookup/${encodeURIComponent(patientCode)}/export`, { responseType: 'json' })
 export const setPatientRetention = (patientCode: string, retain_indefinitely: boolean) =>
   api.patch<PatientRecord>(`/patients/${encodeURIComponent(patientCode)}/retention`, { retain_indefinitely })
 
@@ -112,7 +116,18 @@ export const getDeviceStatus = () => api.get('/devices/status')
 export const connectDevice = (payload: { port: string; baud_rate: number; sensor_type: string; simulator_profile?: 'healthy' | 'volatile' }) =>
   api.post('/devices/connect', payload)
 export const disconnectDevice = () => api.post('/devices/disconnect')
-export const getCohortAnalytics = () => api.get('/analytics/cohorts')
+export type CohortFilters = {
+  provenance?: string
+  study_id?: string
+  sensor_type?: string
+  quality_status?: string
+  date_from?: string
+  date_to?: string
+}
+export const getCohortAnalytics = (filters: CohortFilters = {}) => {
+  const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value && value !== 'all'))
+  return api.get('/analytics/cohorts', { params })
+}
 
 export const startAcquisition = (payload: {
   session_id: string
@@ -126,16 +141,26 @@ export const stopAcquisition = () => api.post('/acquisition/stop')
 export const getAcquisitionStatus = () => api.get('/acquisition/status')
 export const getLiveBuffer = (channel: string, max_samples = 1000) =>
   api.get('/acquisition/live-buffer', { params: { channel, max_samples } })
+export const getLiveAnalysis = () => api.get('/acquisition/live-analysis')
 
 export const getProfiles = () => api.get('/processing/profiles')
 export const simulateAndAnalyse = (payload: object) => api.post('/simulate-and-analyse', payload)
 export const analyseSession = (payload: object) => api.post('/processing/analyse', payload)
 export const getAlgorithms = () => api.get('/algorithms')
 export const computeNPI = (payload: object) => api.post('/algorithms/npi/compute', payload)
+export type FormulaRecord = { id: string; version: number; name: string; expression: string; tbr_min: number; tbr_max: number; status: string; change_note: string | null; created_at: string | null }
+export const getAlgorithmFormulas = () => api.get<FormulaRecord[]>('/algorithms/formulas')
+export const createAlgorithmFormula = (payload: { name: string; expression: string; tbr_min: number; tbr_max: number; change_note: string }) => api.post<FormulaRecord>('/algorithms/formulas', payload)
+export const retireAlgorithmFormula = (id: string) => api.delete(`/algorithms/formulas/${encodeURIComponent(id)}`)
+export const evaluateAlgorithmFormula = (id: string, payload: { tbr: number; quality_status: string }) => api.post(`/algorithms/formulas/${encodeURIComponent(id)}/compute`, payload)
+export const evaluateAlgorithmFormulaOnSession = (id: string, payload: { session_id: string; channel?: string }) => api.post(`/algorithms/formulas/${encodeURIComponent(id)}/evaluate-session`, payload)
+export const getAlgorithmEvaluations = (limit = 100, offset = 0) => api.get<any[]>('/algorithms/evaluations', { params: { limit, offset } })
+export const exportAlgorithmEvaluations = () => api.get('/algorithms/evaluations/export', { params: { format: 'csv' }, responseType: 'text' })
 
 export const getSessions = (limit = 50, offset = 0) =>
   api.get<{ sessions: SessionRecord[]; total: number; stats: Record<string, unknown> }>('/sessions', { params: { limit, offset } })
 export const getSession = (id: string) => api.get<SessionRecord>(`/sessions/${encodeURIComponent(id)}`)
+export const deleteSession = (id: string) => api.delete(`/sessions/${encodeURIComponent(id)}`)
 export const exportSession = (id: string, format: 'json' | 'csv' = 'json') =>
   api.get(`/sessions/${encodeURIComponent(id)}/export`, { params: { format }, responseType: format === 'json' ? 'json' : 'text' })
 export const getStudies = () => api.get<Array<{ id: string; name: string; sensor_type: string; protocol_version: string }>>('/studies')

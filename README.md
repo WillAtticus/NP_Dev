@@ -57,17 +57,14 @@ python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 
 ### Running the Windows desktop app
 
-After installing Python requirements and the frontend dependencies above, install Electron once and start NeuroPulse:
+On the first launch, `scripts/start.ps1` checks for Node.js 20+ and prepares missing local UI, Electron, and API runtime dependencies. Internet access is needed only for that initial setup. Once setup is complete, the app starts locally without a browser:
 
 ```powershell
-Set-Location frontend/neuropulse-ui
-npm ci
-Set-Location ../../desktop
-npm install
-npm start
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\start.ps1
 ```
 
-This builds the React interface, starts the local API, and opens a standalone NeuroPulse window. Later launches can use `scripts/start.ps1`, which now opens the desktop app by default. The app stores local data under `data/` while running from the project checkout. `NEUROPULSE_PYTHON` can point to a specific Python executable if `python` is not on PATH. This developer-run desktop shell is not yet a self-contained Windows installer; packaging the Python runtime/backend is still open.
+This prepares the React interface, starts the local API, and opens a NeuroPulse window. The API runtime is installed from `backend/requirements-runtime.txt` into `.venv`; development extras in `backend/requirements.txt` are not installed by the app launcher. The app stores local data under `data/` while running from the project checkout. `NEUROPULSE_PYTHON` can point to a specific Python executable if needed. This developer-run desktop shell is not yet a self-contained Windows installer; packaging the Python runtime/backend is still open.
 
 ### Running the Streamlit development dashboard
 

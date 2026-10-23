@@ -13,7 +13,7 @@ export default function LiveSensingPage() {
   const [participantMode, setParticipantMode] = useState<'new' | 'existing'>('new')
   const [participantName, setParticipantName] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
-  const [chromosomeMarker, setChromosomeMarker] = useState<'' | 'X' | 'Y'>('')
+  const [reportedSex, setReportedSex] = useState<'' | 'female' | 'male'>('')
   const [studyId, setStudyId] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('raw_counts')
   const [message, setMessage] = useState('')
@@ -69,11 +69,11 @@ export default function LiveSensingPage() {
       let code = participantCode.trim().toUpperCase()
       if (participantMode === 'new') {
         if (!participantName.trim()) throw new Error('Nhập tên/mã hiển thị người tham gia trước khi cấp mã.')
-        if (!chromosomeMarker) throw new Error('Chọn XX hoặc XY theo quy ước của nhóm để tạo mã bệnh nhân.')
+        if (!reportedSex) throw new Error('Chọn giới tính để hệ thống cấp mã bệnh nhân.')
         const created = await createPatient({
           full_name: participantName.trim(),
           date_of_birth: dateOfBirth || undefined,
-          chromosome_marker: chromosomeMarker,
+          reported_sex: reportedSex,
         })
         code = created.data.patient_code
         setParticipantCode(code)
@@ -98,7 +98,7 @@ export default function LiveSensingPage() {
         <label className="text-xs text-gray-400">Hồ sơ người tham gia<select value={participantMode} onChange={(e) => setParticipantMode(e.target.value as 'new' | 'existing')} className="mt-1 w-full bg-np-dark border border-np-border rounded px-3 py-2 text-sm text-white"><option value="new">Người tham gia mới · tự cấp mã</option><option value="existing">Dùng mã đã có</option></select></label>
         {participantMode === 'new' ? <div className="grid grid-cols-2 gap-2">
           <input aria-label="Tên hoặc mã hiển thị người tham gia" required maxLength={160} placeholder="Tên / mã hiển thị" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="bg-np-dark border border-np-border rounded px-3 py-2 text-sm text-white" />
-          <select aria-label="Nhiễm sắc thể theo quy ước nhóm" required value={chromosomeMarker} onChange={(e) => setChromosomeMarker(e.target.value as '' | 'X' | 'Y')} className="bg-np-dark border border-np-border rounded px-3 py-2 text-sm text-white"><option value="">Chọn XX/XY</option><option value="X">XX (mã X)</option><option value="Y">XY (mã Y)</option></select>
+          <label className="text-xs text-gray-400">Giới tính<select aria-label="Giới tính" required value={reportedSex} onChange={(e) => setReportedSex(e.target.value as '' | 'female' | 'male')} className="mt-1 w-full bg-np-dark border border-np-border rounded px-3 py-2 text-sm text-white"><option value="">Chọn giới tính</option><option value="female">Nữ</option><option value="male">Nam</option></select><small className="text-gray-500">Quy ước mã: Nữ→X, Nam→Y; không phải xét nghiệm nhiễm sắc thể.</small></label>
           <input aria-label="Ngày sinh, nếu có" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="col-span-2 bg-np-dark border border-np-border rounded px-3 py-2 text-sm text-white" />
         </div> : <label className="block text-xs text-gray-400">Mã bệnh nhân<input required maxLength={20} value={participantCode} onChange={(e) => setParticipantCode(e.target.value.toUpperCase())} className="mt-1 w-full bg-np-dark border border-np-border rounded px-3 py-2 text-sm font-mono text-white" /></label>}
         {participantCode && <p className="text-xs text-emerald-300">Mã đã cấp cho phiên: <strong className="font-mono">{participantCode}</strong></p>}

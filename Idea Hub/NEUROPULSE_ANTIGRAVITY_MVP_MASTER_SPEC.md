@@ -87,19 +87,25 @@ Khi physical MVP hoàn thành, phần mềm cần có khả năng:
 
 ### 1.5. Cập nhật định hướng nhóm — 21/10/2026
 
-Các quyết định dưới đây là cập nhật trực tiếp từ nhóm và ghi đè những phần mâu thuẫn trong bản spec ban đầu. Phạm vi triển khai trước mắt là prototype local trên Windows 10/11 để thi KHKT, demo science fair, thử nghiệm phần mềm và so sánh cả hai cấu hình cảm biến; chưa phải bản thương mại hay hệ thống triển khai đa máy.
+Các quyết định dưới đây là cập nhật trực tiếp từ nhóm và ghi đè những phần mâu thuẫn trong bản spec ban đầu. Đây là cùng một sản phẩm dự kiến đi kèm vòng đeo tay khi phát hành; không thiết kế như demo dùng một lần. Giai đoạn hiện tại là phát triển và xác minh trên Windows 10/11 để thi KHKT, demo science fair, thử nghiệm phần mềm và so sánh cả hai cấu hình cảm biến. Mục tiêu thương mại/bệnh viện là định hướng tương lai, không phải trạng thái đã đạt hay phạm vi triển khai hiện tại.
 
 - Thiết kế cả trải nghiệm bệnh nhân và các mode nhân viên/chuyên môn. Bệnh nhân nhập mã để mở hồ sơ cá nhân; nhân viên chọn mode trên máy. Trong prototype, các mode là giới hạn giao diện/thao tác, không được mô tả như xác thực danh tính hay bảo mật triển khai bệnh viện.
 - Cả Piezo và ADXL345 phải được hỗ trợ để nhóm đo và so sánh trên cùng nền tảng.
-- Hồ sơ prototype có patient code, tên, ngày sinh, dấu hiệu nhiễm sắc thể theo quy ước mã, tiền sử cá nhân, tiền sử gia đình, chế độ ăn (chay/mặn), cùng các phiên đo, kết quả, cảnh báo demo và lịch sử. Những trường nhận dạng trực tiếp này được nhóm yêu cầu cho prototype; chỉ lưu local và phải chịu chính sách retention 3 tuần/giữ vô thời hạn đã nêu.
+- Hồ sơ prototype có patient code, tên, ngày sinh, giới tính khai báo với marker X/Y chỉ dùng theo quy ước mã, tiền sử cá nhân, tiền sử gia đình, chế độ ăn (chay/mặn), cùng các phiên đo, kết quả, cảnh báo demo và lịch sử. Marker không phải kết quả xét nghiệm nhiễm sắc thể. Những trường nhận dạng trực tiếp này được nhóm yêu cầu cho prototype; chỉ lưu local và phải chịu chính sách retention 3 tuần/giữ vô thời hạn đã nêu.
 - Bệnh nhân xem số đo/kết quả live, biểu đồ, lịch sử và thông tin cá nhân. Các mode Admin, Researcher, Operator và Clinical Reviewer có thể xem dữ liệu toàn hệ thống theo giới hạn từng mode; Operator có quyền nghiên cứu như Researcher. Bác sĩ không cần một hệ thống tài khoản bệnh viện riêng trong prototype.
-- Hệ thống tạo mã bệnh nhân để tra cứu local. Định dạng dự kiến: `N` + mã nhiễm sắc thể (`X` = XX, `Y` = XY) + nhóm tuổi (`I`, `C`, `J`, `Y`, `M`, `E`) + hai số năm đo đầu tiên + năm chữ số ngẫu nhiên `00001–99999`. Mã không chứa năm sinh. Cần kiểm tra trùng mã khi cấp; trường hợp nhiễm sắc thể chưa rõ/khác XX/XY cần được biểu diễn mà không tự suy đoán.
+- Hệ thống tạo mã bệnh nhân để tra cứu local. Định dạng dự kiến: `N` + marker quy ước (`X` dùng cho nữ, `Y` dùng cho nam) + nhóm tuổi (`I`, `C`, `J`, `Y`, `M`, `E`) + hai số năm đo đầu tiên + năm chữ số ngẫu nhiên `00001–99999`. Mã không chứa năm sinh. Cần kiểm tra trùng mã khi cấp. Marker không khẳng định nhiễm sắc thể/karyotype; xử lý trường hợp giới tính chưa rõ/chưa khai báo hoặc ngoài hai lựa chọn hiện tại vẫn là quyết định mở.
 - Mặc định giữ hồ sơ, raw/continuous recording, kết quả và lịch sử trong 3 tuần; Admin có thể bật lưu vô thời hạn cho nghiên cứu. Sau thời hạn, dữ liệu hết hạn phải được xóa theo chính sách đã cấu hình.
 - Bệnh nhân chỉ xuất được dữ liệu cá nhân của mình. Các mode Admin, Clinical Reviewer, Operator và Researcher được xuất/xóa dữ liệu toàn hệ thống theo phạm vi prototype.
 - Nhóm yêu cầu demo cảnh báo thật theo giả thuyết/ngưỡng có trong tài liệu trước. Handoff cũ ghi các dải NPI: `>=70` trong khoảng tham chiếu, `40–69` theo dõi, `<40` ngoài khoảng tham chiếu. Có thể dùng các dải này cho demo nghiên cứu theo yêu cầu mới của nhóm, nhưng phải gắn nhãn giả thuyết/thử nghiệm, lưu phiên bản quy tắc và không trình bày là xác nhận y khoa/lâm sàng. Clinical validation vẫn là công việc riêng.
 - Thu thập với người tham gia thật chỉ bắt đầu sau khi nhóm có cố vấn chuyên môn, xin phép người tham gia và hoàn thành các phê duyệt/quy trình phù hợp.
-- Dữ liệu đa máy/đồng bộ và triển khai thương mại nằm ngoài prototype hiện tại.
-- Ứng dụng dành cho nhóm Windows được mở trong cửa sổ desktop riêng; không yêu cầu người dùng mở Chrome/Edge hoặc nhập địa chỉ localhost. Giao diện React được đóng gói trong ứng dụng Electron, còn API, SQLite và file đo vẫn chạy local. Đây là vỏ desktop cho prototype; chưa đồng nghĩa với installer độc lập hay nghiệm thu lâm sàng.
+- Ở giai đoạn hiện tại, dữ liệu đa máy/đồng bộ, dịch vụ thương mại và triển khai bệnh viện chưa được bật. Kiến trúc vẫn thuộc lộ trình của sản phẩm đeo tay cuối cùng; không loại bỏ nền tảng bằng cách đóng gói demo throwaway. Trước khi dùng chung hoặc phát hành cần hoàn thiện danh tính/phân quyền thực, bảo vệ dữ liệu, cài đặt/cập nhật, hỗ trợ vận hành, intended use/claim và các bằng chứng kiểm định thích hợp.
+- Ứng dụng dành cho nhóm Windows được mở trong cửa sổ desktop riêng; không yêu cầu người dùng mở Chrome/Edge hoặc nhập địa chỉ localhost. Giao diện React được đóng gói trong ứng dụng Electron, còn API, SQLite và file đo vẫn chạy local. Đây là bước triển khai hiện tại của cùng sản phẩm; chưa đồng nghĩa với installer độc lập, nghiệm thu lâm sàng hay sẵn sàng bán.
+
+### 1.5.1. Định hướng sản phẩm xuyên suốt — 22/10/2026
+
+- Người dùng xác nhận mục tiêu từ đầu là sản phẩm đồng hành với vòng đeo tay, dự kiến phát hành đúng sản phẩm được phát triển qua các giai đoạn. Giai đoạn nghiên cứu/demo là bước phát triển hiện tại, không thay đổi đích đến sản phẩm.
+- Các mode Admin, Operator, Researcher, Clinical Reviewer, Kiosk và Patient hiện được chuyển đổi trên máy để hỗ trợ demo/nghiên cứu; chưa khóa theo tài khoản cá nhân. Đây là quyết định cho giai đoạn hiện tại, không phải mô hình phân quyền đủ dùng khi phát hành hoặc triển khai tại bệnh viện.
+- Thị trường đầu tiên, intended use/claim cuối cùng, chủ sở hữu phê duyệt y khoa và lộ trình pháp quy chưa được nhóm xác định. Không tự suy đoán hoặc quảng bá app hiện tại như thiết bị chẩn đoán/đã sẵn sàng thương mại; ghi các mục này vào `docs/OPEN_TECHNICAL_DECISIONS.md` và đóng trước các mốc phát hành tương ứng.
 
 ### 1.6. Cập nhật vận hành và hiển thị dữ liệu — 22/10/2026
 
@@ -115,6 +121,13 @@ Các quyết định dưới đây là cập nhật trực tiếp từ nhóm và
 - Bố cục phiên đo ưu tiên waveform live khi acquisition đang chạy; kết quả NPI thử nghiệm là vùng nổi bật; thông tin cá nhân của phiên và lịch sử nằm cạnh/bên dưới; nút bắt đầu/dừng dễ nhận biết.
 - Patient chỉ nhận dữ liệu/phiên thuộc mã đang chọn, không có trang thống kê toàn hệ thống, phân tích nhóm, chi tiết thiết bị/raw kỹ thuật hay lab nghiên cứu. Kết quả NPI và cảnh báo vẫn mang nhãn giả thuyết thử nghiệm, không phải chẩn đoán.
 - API mode patient chỉ đọc live buffer, phân tích lịch sử, bắt đầu hoặc dừng khi mã trong header khớp mã phiên/hồ sơ. Đây là phạm vi workflow local của prototype, không phải xác thực danh tính bảo mật.
+
+### 1.8. Cập nhật nhịp đo live và thời lượng phiên — 22/10/2026
+
+- Khi đo, waveform phải chạy/cập nhật liên tục theo tín hiệu thực nhận và cuộn trong cửa sổ gần nhất, trực quan như màn hình ECG; không dùng sóng minh họa hard-coded thay cho buffer acquisition.
+- NPI thử nghiệm được tính lặp lại trên cửa sổ tín hiệu gần nhất sau khi đạt quality gate và đủ cửa sổ xử lý 8 giây. Trước thời điểm đó, chỉ hiển thị waveform cùng trạng thái chưa đủ dữ liệu; không hiển thị NPI hoặc cảnh báo dựa trên giá trị cũ.
+- Phiên Patient mode tự dừng, lưu raw immutable và chốt kết quả sau 30 giây. Dừng thủ công vẫn được hỗ trợ. Provenance, quality flags và thông tin cấu hình phiên phải được giữ như các phiên khác.
+- NPI live và các dải cảnh báo tiếp tục mang nhãn giả thuyết thử nghiệm, không phải chẩn đoán hoặc nguy cơ lâm sàng đã được xác nhận.
 
 ---
 
@@ -1434,6 +1447,14 @@ Do đó:
 - Việc nghiên cứu trên người thật cần sự chấp thuận, đồng thuận hợp lệ, bảo vệ riêng tư và giám sát chuyên môn phù hợp.
 
 ---
+
+### 1.9. Cập nhật hồ sơ và phòng thí nghiệm thuật toán — 22/10/2026
+
+- Tạo hồ sơ hỏi giới tính khai báo (Nam/Nữ); phần mềm ánh xạ theo quy ước mã đã chọn: Nam → marker Y / chuỗi XY, Nữ → marker X / chuỗi XX. Marker chỉ phục vụ tạo patient code; không phải kết quả xét nghiệm nhiễm sắc thể và không được dùng để suy luận kiểu gen.
+- Patient mode chỉ mở biểu mẫu khi người dùng chọn “Ghi nhận bệnh nhân mới”; mục “Lịch sử đo” xuất hiện trong điều hướng Patient mode.
+- Algorithm Lab phải mô tả đầu vào, xử lý, đầu ra, quality gates, phiên bản, nguồn mã và tham số. Các hướng dẫn nghiên cứu/phát triển phần mềm y tế là tiêu chí quản lý chất lượng/báo cáo, không thay thế nghiên cứu xác nhận thuật toán NeuroPulse.
+- Phiên bản công thức Lab được lưu bền vững; cập nhật tạo phiên bản mới, xóa là ngừng dùng (retire) để giữ dấu vết. Lab hỗ trợ DSL số học có giới hạn (`tbr`, `tbr_min`, `tbr_max`, +, −, ×, ÷, `clip`) và từ chối thực thi mã tùy ý; mọi công thức vẫn là thử nghiệm.
+- Thu nhận live và tóm tắt phiên mặc định vẫn chạy NPI baseline tích hợp. Algorithm Lab có thể chạy lại pipeline trên raw session đã lưu rồi đánh giá công thức đã chọn; kết quả được audit riêng, không ghi đè tóm tắt mặc định. Phiên bản công thức chưa được gán vào acquisition live.
 
 ## 23. Hướng dẫn bắt đầu ngay trong Antigravity
 

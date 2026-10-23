@@ -26,7 +26,7 @@ export default function PatientRegistryPage({ role }: { role: LocalRole }) {
       const { data } = await createPatient({
         full_name: String(form.get('full_name') || '').trim(),
         date_of_birth: String(form.get('date_of_birth') || '') || undefined,
-        chromosome_marker: String(form.get('chromosome_marker')) as 'X' | 'Y',
+        reported_sex: String(form.get('reported_sex')) as 'female' | 'male',
         medical_history: String(form.get('medical_history') || '').trim() || undefined,
         family_history: String(form.get('family_history') || '').trim() || undefined,
         diet: (String(form.get('diet') || '') || undefined) as 'vegetarian' | 'omnivore' | undefined,
@@ -50,15 +50,15 @@ export default function PatientRegistryPage({ role }: { role: LocalRole }) {
       <h2 className="text-lg font-semibold md:col-span-2">Tạo hồ sơ mới</h2>
       <label className="text-sm">Họ và tên<input name="full_name" required maxLength={160} className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2" /></label>
       <label className="text-sm">Ngày sinh<input name="date_of_birth" type="date" className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2" /></label>
-      <label className="text-sm">Nhiễm sắc thể theo quy ước nhóm<select name="chromosome_marker" required className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2"><option value="X">XX (mã X)</option><option value="Y">XY (mã Y)</option></select></label>
+      <label className="text-sm">Giới tính<select name="reported_sex" required className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2"><option value="female">Nữ</option><option value="male">Nam</option></select><small className="block text-gray-500">Quy ước mã nội bộ: nữ → X, nam → Y; không phải xét nghiệm nhiễm sắc thể.</small></label>
       <label className="text-sm">Chế độ ăn<select name="diet" className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2"><option value="">Chưa ghi nhận</option><option value="vegetarian">Chay</option><option value="omnivore">Mặn</option></select></label>
       <label className="text-sm md:col-span-2">Tiền sử cá nhân<textarea name="medical_history" maxLength={4000} rows={2} className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2" /></label>
       <label className="text-sm md:col-span-2">Tiền sử gia đình<textarea name="family_history" maxLength={4000} rows={2} className="mt-1 block w-full rounded border border-np-border bg-np-dark p-2" /></label>
       <button disabled={working} className="rounded bg-np-blue px-4 py-2 font-semibold text-black disabled:opacity-50 md:col-span-2">{working ? 'Đang tạo…' : 'Tạo hồ sơ và cấp mã'}</button>
     </form>
     <div className="overflow-x-auto rounded-lg border border-np-border bg-np-panel">
-      <table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-np-dark text-gray-400"><tr>{['Mã / bệnh nhân','Nhóm tuổi','Nhiễm sắc thể','Ngày sinh','Lưu trữ'].map((item) => <th key={item} className="p-3">{item}</th>)}</tr></thead>
-        <tbody>{patients.map((patient) => <tr key={patient.id} className="border-t border-np-border"><td className="p-3"><code>{patient.patient_code}</code><div className="text-gray-400">{patient.full_name}</div></td><td className="p-3">{ageLabels[patient.age_band] || patient.age_band}</td><td className="p-3">{patient.chromosome_marker === 'X' ? 'XX' : 'XY'}</td><td className="p-3">{patient.date_of_birth || '—'}</td><td className="p-3">{role === 'admin' ? <label className="flex items-center gap-2"><input type="checkbox" checked={patient.retain_indefinitely} onChange={(event) => void toggleRetention(patient, event.target.checked)} />Vô thời hạn</label> : patient.retain_indefinitely ? 'Vô thời hạn' : `Đến ${patient.retention_expires_at ? new Date(patient.retention_expires_at).toLocaleDateString() : 'hết hạn'}`}</td></tr>)}</tbody>
+      <table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-np-dark text-gray-400"><tr>{['Mã / bệnh nhân','Nhóm tuổi','Giới tính','Ngày sinh','Lưu trữ'].map((item) => <th key={item} className="p-3">{item}</th>)}</tr></thead>
+        <tbody>{patients.map((patient) => <tr key={patient.id} className="border-t border-np-border"><td className="p-3"><code>{patient.patient_code}</code><div className="text-gray-400">{patient.full_name}</div></td><td className="p-3">{ageLabels[patient.age_band] || patient.age_band}</td><td className="p-3">{patient.reported_sex === 'female' ? 'Nữ' : patient.reported_sex === 'male' ? 'Nam' : 'Chưa ghi nhận'}</td><td className="p-3">{patient.date_of_birth || '—'}</td><td className="p-3">{role === 'admin' ? <label className="flex items-center gap-2"><input type="checkbox" checked={patient.retain_indefinitely} onChange={(event) => void toggleRetention(patient, event.target.checked)} />Vô thời hạn</label> : patient.retain_indefinitely ? 'Vô thời hạn' : `Đến ${patient.retention_expires_at ? new Date(patient.retention_expires_at).toLocaleDateString() : 'hết hạn'}`}</td></tr>)}</tbody>
       </table>
       {loading && <p className="p-4 text-sm text-gray-400">Đang tải hồ sơ…</p>}
       {!loading && patients.length === 0 && <p className="p-4 text-sm text-gray-400">Chưa có hồ sơ.</p>}

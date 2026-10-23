@@ -4,7 +4,7 @@
 
 **Nguồn ưu tiên:** `Idea Hub/NEUROPULSE_ANTIGRAVITY_MVP_MASTER_SPEC.md` (phiên bản mới nhất) + các quyết định người dùng ghi ở phần cập nhật 21–22/10/2026 + các quyết định trong `docs/OPEN_TECHNICAL_DECISIONS.md`. Nếu mâu thuẫn, không tự chọn: ghi decision, cập nhật hợp đồng và xin nhóm/chuyên gia xác nhận.
 
-**Ranh giới sản phẩm:** mục tiêu hiện được tài liệu hóa là prototype nghiên cứu nội bộ, local-first trên Windows 10/11, hỗ trợ mô phỏng và so sánh Piezo/ADXL345. NPI/ngưỡng là giả thuyết thử nghiệm, không phải chẩn đoán hay xác suất mắc Parkinson. “Đầu ngành”, “chính xác”, “sẵn sàng kiểm nghiệm lâm sàng” không thể được xác nhận bằng code/UI đơn thuần; cần dữ liệu, quy trình nghiên cứu, giám sát chuyên môn, xác minh thiết bị và phê duyệt phù hợp. Không quảng bá app là clinical-ready/commercial-ready cho đến khi có bằng chứng và quy trình tương ứng.
+**Ranh giới sản phẩm:** người dùng xác nhận NeuroPulse là một sản phẩm đồng hành với vòng đeo tay, dự kiến tiếp tục phát triển tới phát hành; giai đoạn hiện tại là nghiên cứu, thử nghiệm physical MVP và demo, không phải nhánh demo dùng một lần. Hiện app vẫn local-first trên Windows 10/11, hỗ trợ mô phỏng và so sánh Piezo/ADXL345. NPI/ngưỡng là giả thuyết thử nghiệm, không phải chẩn đoán hay xác suất mắc Parkinson. “Đầu ngành”, “chính xác”, “sẵn sàng kiểm nghiệm lâm sàng” không thể được xác nhận bằng code/UI đơn thuần; cần dữ liệu, quy trình nghiên cứu, giám sát chuyên môn, xác minh thiết bị và phê duyệt phù hợp. Không quảng bá app là clinical-ready/commercial-ready cho đến khi có bằng chứng và quy trình tương ứng. Thị trường đầu tiên, intended use/claim và chủ sở hữu phê duyệt còn mở ở D-027.
 
 ## 1. Trạng thái đã có theo bằng chứng hiện trong repo
 
@@ -14,7 +14,7 @@ Các mục dưới đây có mã/tài liệu hoặc ghi nhận build/test trư�
 - Patient self-measurement workspace, tạo/tra cứu mã bệnh nhân, bắt đầu/dừng đo, waveform live, kết quả/thông báo thử nghiệm và lịch sử theo mã. Nhân viên có các mode Admin/Operator/Researcher/Clinical Reviewer/Kiosk; đây là mode giao diện, không phải xác thực.
 - Hai adapter cảm biến, protocol nhị phân CRC, simulator Healthy/Volatile, provenance cho dữ liệu mô phỏng, xử lý Butterworth/Welch, quality gates và công thức NPI thử nghiệm.
 - Trang nghiên cứu gồm phiên, hồ sơ, thiết bị/phân tích/algorithm lab và analytics cohort; có SQLite migrations, backup/restore helper, retention service, audit events và export phiên ở backend.
-- Ghi nhận gần nhất: build React, compile Python và import/OpenAPI đã qua; bộ backend 37 test từng qua trước các thay đổi Patient workspace mới nhất. Workflow Electron hoàn chỉnh, UI/e2e mới nhất, cách ly hai mã bệnh nhân, thiết bị thật và HIL chưa được xác minh. Không suy diễn kết quả kiểm thử lịch sử thành trạng thái hiện tại.
+- Ghi nhận kiểm tra lại ngày 2026-10-22: backend `51 passed` (1 cảnh báo deprecation TestClient/Starlette), frontend `2 passed`, desktop build 141 modules và copy thành công sang `desktop/ui`; launcher `-PrepareOnly` qua. Electron launch qua lệnh desktop đã ghi nhận API health thành công và `Main window is ready to show`; Chromium vẫn in cảnh báo cache Access Denied nhưng không chặn cửa sổ. Chưa có visual QA/e2e thao tác đủ flow, cách ly hai mã end-to-end, thiết bị thật/HIL. Không suy diễn các kiểm tra này thành clinical/commercial readiness.
 
 ## 2. Backlog theo mức ưu tiên
 
@@ -23,15 +23,16 @@ Trạng thái ban đầu: **CẦN XÁC MINH** nghĩa là có phần triển khai
 ### P0 — Đóng luồng đo cốt lõi, tính toàn vẹn và độ tin cậy
 
 1. **Luồng bệnh nhân đầu-cuối — CẦN XÁC MINH**
-   - Xác nhận Patient mode mặc định; tạo hồ sơ/mã, mở lại đúng hồ sơ bằng mã; form thông tin cá nhân/tiền sử đủ trường đã thống nhất, validation, sửa/xóa theo quyền và thông báo lỗi dễ hiểu.
-   - Kiểm tra bắt đầu/dừng, waveform từ dữ liệu nhận thật, trạng thái kết nối/đang đo/lỗi, NPI chỉ xuất hiện khi đủ dữ liệu, cảnh báo demo có phiên bản/quy tắc, lưu phiên dưới đúng mã và tải lịch sử sau khi khởi động lại.
+   - **ĐÃ TRIỂN KHAI, ĐÃ KIỂM TRA BACKEND/BUILD; DESKTOP/HIL CẦN XÁC MINH:** NPI live đọc cửa sổ rolling 8 giây từ buffer RAM và cập nhật trong lúc đo; trước đủ thời lượng/quality gate không trả NPI. Patient UI có waveform cuộn, trạng thái chất lượng và countdown 30 giây; backend tự dừng/chốt phiên khi đạt 30 giây, kể cả UI đóng. Backend suite 51 passed, frontend 2 passed, desktop React/Vite build 141 modules và đã copy sang `desktop/ui`. Còn kiểm tra trực quan độ mượt trên Electron và thực tế với cả hai simulator profile.
+   - **ĐÃ CÓ CODE; TEST SUITE VÀ BUILD ĐẠT, DESKTOP FLOW CHƯA XÁC MINH:** Patient mode mặc định, tạo hồ sơ/mã và tra cứu theo mã; form submit tên, ngày sinh tùy chọn, XX/XY, tiền sử cá nhân/gia đình tùy chọn và chế độ ăn tùy chọn. Còn thiếu luồng sửa hồ sơ; cần kiểm tra validation, xử lý lỗi và hiển thị thông tin hồ sơ cho bệnh nhân.
+   - Còn xác minh đầu-cuối trên Electron: bắt đầu/dừng, waveform từ buffer acquisition, trạng thái kết nối/lỗi, cảnh báo demo gắn phiên bản/quy tắc, lưu đúng mã và tải lịch sử sau restart. Live rolling NPI và tự dừng 30 giây đã có test backend; chưa có bằng chứng desktop/HIL cho hành vi tương ứng.
    - Mã không đổi trong phiên đang đo. Chạy kiểm tra cách ly tối thiểu hai hồ sơ: live buffer, analysis, history và export của mã A không được lộ sang mã B.
-   - **Bệnh nhân cần xuất dữ liệu cá nhân** (thông tin được phép, phiên, chuỗi đo/kết quả, cảnh báo, lịch sử) ở định dạng tài liệu hóa; backend hiện có export phiên, nhưng handoff ghi Patient export trong màn hình mới còn thiếu. Đảm bảo không xuất dữ liệu người khác.
+   - **ĐÃ CÓ CODE; BACKEND 45 TESTS, FRONTEND 2 TESTS VÀ BUILD ĐẠT; DESKTOP FLOW CHƯA XÁC MINH:** Patient workspace có nút xuất JSON hồ sơ cá nhân và tóm tắt phiên liên kết; payload dành cho bệnh nhân bỏ raw sensor arrays và chi tiết thiết bị/xử lý. API yêu cầu loopback, Patient mode, mã chọn khớp, và ghi audit. Test xác nhận role denial, selected-code isolation và redaction; còn phải kiểm tra trên desktop, empty-history và kết quả thiếu. Patient code không xác thực danh tính.
    - Tiêu chí hoàn tất: workflow chạy được trên desktop, dữ liệu tồn tại sau restart, mọi kết quả truy được về phiên/raw/provenance, test API/UI cho happy path và lỗi.
 
 2. **Thu nhận live và quản lý lỗi — CẦN XÁC MINH**
    - Đảm bảo acquisition chạy trong worker độc lập UI; UI không làm chậm nhận mẫu; buffer có giới hạn/backpressure; mất kết nối, packet lỗi, sequence gap, CRC lỗi, timeout, dừng đột ngột và khởi động lại được thể hiện rõ và không làm hỏng dữ liệu đã lưu.
-   - Xác minh WebSocket/event hoặc cơ chế refresh live dùng ở desktop; không dựa vào hình sóng hardcode. Phân biệt raw preview với phân tích đủ cửa sổ 8s; không nội suy/thay raw để lấp khoảng trống.
+   - Cơ chế hiện tại là polling định kỳ cho live waveform và rolling NPI; xác minh nhịp cập nhật, độ mượt và tải trên Electron. Không dựa vào hình sóng hardcode. Phân biệt raw preview với phân tích đủ cửa sổ 8s; không nội suy/thay raw để lấp khoảng trống.
    - Ghi measured sample rate, timestamps, sample count, packet loss/jitter và quality flags; không hiển thị target rate như giá trị đo thực tế.
    - Tiêu chí hoàn tất: test tất cả trạng thái và lỗi bằng simulator; UI hiển thị dữ liệu đang đến và cuối phiên đúng với file persisted.
 
@@ -61,14 +62,14 @@ Trạng thái ban đầu: **CẦN XÁC MINH** nghĩa là có phần triển khai
 
 7. **Retention, export/delete và backup — THIẾU/CHƯA ĐẠT MỘT PHẦN**
    - Xác minh purge 21 ngày cho hồ sơ, sessions, raw file, exports/cache và liên kết phụ; hành vi active session; giữ vô thời hạn khi được bật; restart/giờ hệ thống sai; audit/consent cần được giữ hay xóa. Có preview/summary trước thao tác phá hủy và audit rõ ràng.
-   - Chốt liệu nhân viên nào được export/delete toàn hệ thống theo quyết định hiện tại; đảm bảo patient chỉ export hồ sơ mình. Hiện role-wide export/delete parity chưa hoàn tất; UI restriction và API restriction phải thống nhất cho prototype (nhưng mode không phải security boundary).
+   - Quyết định nhóm đã quy định Admin/Operator/Researcher/Clinical Reviewer được export/delete dữ liệu theo phạm vi prototype; API xóa phiên và export phiên hiện đã cho cả bốn mode. Clinical Reviewer chỉ nhận metadata phiên lâm sàng và không nhận sensor/profile ID, sample rate/count, raw path, checksum, notes hoặc raw channel export. Reviewer cũng bị từ chối cổng serial, trạng thái/luồng acquisition, processing profiles và raw WebSocket; study summary được lọc sensor/cutoff. Toàn bộ 46 backend tests pass; còn phải rà soát khi thêm endpoint mới và xác minh UI trên desktop. Patient vẫn chỉ export hồ sơ/mốc đo theo mã đang chọn. Mode không phải ranh giới bảo mật.
    - Backup utility hiện có và có checksum nhưng archive chưa mã hóa. Chốt chính sách vị trí, quyền truy cập Windows, mã hóa-at-rest/backup, retention backup, restore drill, dung lượng và xử lý khi hỏng ổ đĩa.
    - Tiêu chí hoàn tất: test đủ retention boundary, active recordings, indefinite flag, restore, checksum corruption, overwrite/path traversal và xác nhận không rò dữ liệu giữa patient exports.
 
 8. **Desktop khởi chạy và lỗi vận hành — THIẾU/CHƯA ĐẠT**
-   - Người dùng trước đây gặp thiếu Electron runtime và Python dependencies. Cần khởi chạy ổn định từ shortcut/app trên Windows mà không phải mở PowerShell, cài node_modules/venv hay tự chạy build; lỗi khởi động phải nêu nguyên nhân và cách khắc phục.
+   - **ĐÃ CÓ BOOTSTRAP CHO CHECKOUT HIỆN TẠI:** `scripts/start.ps1` kiểm tra Node 20+, frontend/Electron dependencies, Python 3.11+, tạo `.venv` và cài API runtime nếu thiếu; build UI khi Electron chạy. `-PrepareOnly` đã chạy thành công trong workspace. Người dùng trước đây gặp thiếu Electron runtime/Python dependencies; cần kiểm tra shortcut thật, lỗi cài mạng, và khả năng mở lại sau cài.
    - Kiểm tra Electron↔FastAPI lifecycle: port conflict, backend startup/readiness, crash, exit, stale process, app close, local origin/CORS, cache/log location, offline startup.
-   - Phân biệt developer launcher hiện có với installer độc lập. Làm installer/runtime bundle, clean install/upgrade/uninstall trên máy Windows 10/11 sạch; data path nằm ngoài thư mục chương trình và được giữ qua update.
+   - Phân biệt bootstrap cho repository với installer độc lập. Vẫn cần làm installer/runtime bundle, clean install/upgrade/uninstall trên máy Windows 10/11 sạch; data path nằm ngoài thư mục chương trình và được giữ qua update. Lần chuẩn bị đầu tiên hiện cần internet; chưa có offline installer.
    - Tiêu chí hoàn tất: cài/mở/đo mô phỏng/đóng/mở lại trên máy sạch không cần mạng; không có terminal window lỗi; shortcut hợp lệ.
 
 ### P1 — Hoàn thiện công cụ nghiên cứu và khả năng dùng hàng ngày
@@ -76,7 +77,7 @@ Trạng thái ban đầu: **CẦN XÁC MINH** nghĩa là có phần triển khai
 9. **Staff workspaces, mode/action matrix và API — THIẾU/CHƯA ĐẠT MỘT PHẦN**
    - Hoàn thiện matrix Admin/Operator/Researcher/Clinical Reviewer/Kiosk/Patient theo yêu cầu: Operator có quyền xem như Researcher; Clinical Reviewer xem nghiên cứu nhưng ẩn technical codes/raw protocol; Patient không thấy toàn cục/lab/technical; Kiosk hiện là hướng dẫn/chưa có workflow hoàn chỉnh.
    - Thống nhất UI với API. Mode là hạn chế thao tác prototype, không phải đăng nhập/an toàn. Không tuyên bố bảo vệ dữ liệu trước người dùng Windows khác. Trước shared/hospital/consumer deployment phải thiết kế identity/auth/authorization thực sự.
-   - Staff cần quyền được yêu cầu: tìm/lọc hồ sơ và phiên, xem đầy đủ dữ liệu nghiên cứu/technical, quản lý protocol/study, xử lý export/delete theo mode. Hiện role-specific export/delete chưa parity.
+   - Staff cần quyền được yêu cầu: tìm/lọc hồ sơ và phiên, xem dữ liệu phù hợp với mode, quản lý protocol/study, xử lý export/delete theo mode. Session-level export/delete parity hiện có ở API; reviewer bị giới hạn thông tin kỹ thuật tại session list/detail/export và bị chặn các API thiết bị/raw-stream đã rà soát. Còn thiếu bulk export/delete workflow và review rò rỉ kỹ thuật qua các endpoint nghiên cứu còn lại.
 
 10. **Research protocol/study lifecycle — THIẾU/CHƯA ĐẠT MỘT PHẦN**
     - Study CRUD/template đã có nền tảng; hoàn thiện protocol version, inclusion/exclusion, thời lượng, sensor/profile, mã nghiên cứu, operator/session notes, consent reference/state, phiên bản biểu mẫu/quy trình và gắn study-participant-session.
@@ -84,7 +85,8 @@ Trạng thái ban đầu: **CẦN XÁC MINH** nghĩa là có phần triển khai
     - Tiêu chí hoàn tất: nghiên cứu viên tạo protocol, tạo participant/session, truy nguyên phiên về protocol; dữ liệu export giữ protocol version và consent metadata đã được phép.
 
 11. **Analytics/cohort và báo cáo — CẦN XÁC MINH**
-    - Analytics hiện có cohort counts/nhóm tuổi, chromosome marker, diet và provenance; xác minh lọc theo study/date/sensor/profile/quality/status, empty states, sample size/missingness, cách tính trung bình và tránh trộn modalities.
+    - API/UI lọc provenance, study, ngày UTC bắt đầu/kết thúc, sensor type và quality status. Lọc được áp dụng đồng nhất lên counts, cỡ mẫu và trung bình; ngày cuối tính trọn ngày UTC. Có options lấy từ study/session rows trong SQLite. Backend suite **53 passed** với test lọc kết hợp và biên ngày; frontend **4 passed**.
+    - Còn bổ sung lọc profile/session status, missingness và audit cách tính trung bình/không trộn modalities; thêm export báo cáo đọc được. Kiểm tra trực quan/trải nghiệm trên Electron vẫn cần.
     - Thêm biểu đồ mô tả trực quan: số hồ sơ/phiên theo thời gian, phân bố nhóm và so sánh có phân tầng; nêu n, nguồn, trạng thái dữ liệu và loại provenance. Không suy luận ý nghĩa lâm sàng hoặc so sánh nhóm nhỏ như kết luận.
     - Báo cáo/export nghiên cứu tổng thể (CSV/JSON và báo cáo đọc được) cần schema/version, units, quality flags, processing/algorithm snapshots, patient pseudonym; mặc định bỏ PII không cần thiết.
     - Tiêu chí hoàn tất: thống kê tái tạo từ database, khớp dữ liệu fixture đã biết và không đưa simulator vào nhóm dữ liệu người thật.
@@ -100,9 +102,10 @@ Trạng thái ban đầu: **CẦN XÁC MINH** nghĩa là có phần triển khai
     - Mọi bảng/chart/export phải phân biệt mô phỏng, benchmark nhập và thiết bị thật. Không dùng synthetic demo làm chứng cứ hiệu năng người bệnh.
 
 14. **UX bệnh nhân, accessibility và an toàn nội dung — CẦN XÁC MINH**
-    - Đảm bảo waveform là nội dung chủ đạo khi đo; NPI thử nghiệm nổi bật nhưng không tạo cảm giác chẩn đoán; status/no-data/error rõ; thông tin đo cá nhân và history dễ đọc; nút start/stop an toàn, có xác nhận khi thao tác có thể mất dữ liệu.
+    - Cấu trúc bố cục theo ảnh chú thích đã được cập nhật trong PatientMeasurementPage: waveform chính giữa, NPI trong panel xanh đậm, thông tin phiên ở panel sáng, mã bệnh nhân được nhấn màu đỏ và nút start/stop nằm ở vùng thao tác đầu trang. Desktop UI bundle đã build thành công; chưa mở Electron để kiểm tra hình ảnh thực tế.
+    - Còn cần xác minh waveform là nội dung chủ đạo khi đo; NPI thử nghiệm nổi bật nhưng không tạo cảm giác chẩn đoán; status/no-data/error rõ; thông tin đo cá nhân và history dễ đọc; nút start/stop an toàn, có xác nhận khi thao tác có thể mất dữ liệu.
     - UI tiếng Việt thống nhất, font/độ tương phản/kích thước chữ, keyboard, scaling màn hình Windows, hiển thị cho người cao tuổi/thị lực hạn chế, không phụ thuộc màu đơn lẻ để truyền đạt cảnh báo.
-    - Thiết kế copy cảnh báo trung tính; không đưa lời khuyên điều trị hay xác suất bệnh. Clinical Reviewer có thể xem kỹ thuật theo yêu cầu nhưng phải ẩn technical sensor/source codes.
+    - Thiết kế copy cảnh báo trung tính; không đưa lời khuyên điều trị hay xác suất bệnh. Clinical Reviewer không nhận các mã định danh thiết bị/profile, thông số thu nhận hoặc raw protocol trong luồng phiên; cần rà soát tất cả endpoint khác để bảo đảm cùng nguyên tắc.
     - Patient data entry: ngày tháng, tuổi band, chromosome encoding X=XX/Y=XY, lịch sử, ăn chay/mặn. Không suy đoán giá trị thiếu. Cần xử lý “không rõ/khác” theo quyết định D-023 trước khi mở rộng form.
     - Tiêu chí hoàn tất: review trực quan ở kích thước cửa sổ mục tiêu, keyboard/contrast check, thao tác với người dùng đại diện có giám sát; sửa các lỗi usability nghiêm trọng.
 
@@ -172,3 +175,56 @@ Agent cần rà soát và cập nhật `docs/OPEN_TECHNICAL_DECISIONS.md`, khôn
 - **Commercial/medical-ready:** cần thêm intended use, regulatory pathway, quality/risk/cybersecurity/usability/clinical evidence và vận hành được thẩm định. Đây không phải cam kết của MVP spec và không thể suy ra từ phần trăm code hoàn thành.
 
 **Kết luận trạng thái tại thời điểm lập kế hoạch:** repo có nền tảng full-stack local và simulator/processing/UI đáng kể, nhưng các gate cốt lõi còn mở gồm xác minh desktop đầu-cuối, cách ly Patient, Patient export, role/API parity, audit/provenance đầy đủ, retention/backup policy, installer clean-machine, D-006 và HIL hai sensor. Chưa có bằng chứng clinical validation; app chưa được gọi là sẵn sàng thử nghiệm lâm sàng hoặc commercial-ready.
+
+## Follow-up items added 2026-10-22
+- [x] Replace chromosome selection with reported-sex selection and explicit internal mapping; retain legacy compatibility.
+- [x] Collapse patient profile creation behind a clear action; expose patient history navigation.
+- [x] Add detailed technical algorithm documentation and persistent formula version/retirement workflow for baseline parameters.
+- [ ] Bind algorithm/profile version and parameter snapshot to each session and reanalysis before enabling alternative formulas in acquisition.
+- [x] Add a bounded arithmetic DSL with runtime validation and tests for custom Lab formulas; arbitrary code execution is rejected. [ ] Define expert review/approval workflow and expanded validation evidence before research use.
+- [ ] Extend participant data dictionary to unknown/not-disclosed/other categories before recruitment outside prototype scope.
+- [ ] Complete desktop click-through, simulator and hardware-in-loop verification; no physical-device or clinical validation evidence exists yet.
+- [ ] Apply research reporting gates from docs/RESEARCH_QUALITY_PLAN.md before any clinical-accuracy study claims.
+
+## Follow-up items added 2026-10-22 — research reproducibility
+- [x] Re-run stored completed raw sessions from Algorithm Lab using a selected safe-DSL formula; include sensor/channel/provenance/rate/quality and version/parameter lineage in response and audit.
+- [x] Add a dedicated persistent algorithm_evaluations table, local history API, and Lab history display alongside audit events. Research export/statistics inclusion remains open.
+- [ ] Verify session formula reanalysis through an interactive desktop click-through with both Piezo and ADXL345 data; current automated session test mocks the reprocessing pipeline.
+- [ ] Resolve full backend test-suite hang in local Windows environment; focused suites pass but the whole suite was not confirmed this turn.
+- [ ] Determine why the desktop process returned exit code -2147483645 after renderer load; current logs show DOM ready/did-finish-load but no visual confirmation.
+
+## Follow-up items added 2026-10-22 — persistent formula evaluations
+- [x] Persist Algorithm Lab evaluations in `algorithm_evaluations`, with a paginated API and staff history view; keep audit entries as an additional action record.
+- [x] Add a staff CSV/JSON export endpoint for formula evaluations. [ ] Include evaluation records in cohort statistics and comprehensive research packages.
+- [ ] Verify actual desktop reanalysis using saved Piezo and ADXL345 sessions; current automated route test mocks the processing call.
+- [ ] Confirm retention/deletion behavior for formula evaluation rows when associated patient/session records expire or are deleted.
+- [ ] Complete deterministic test suite in the Windows local environment; the full-suite run previously stalled while focused tests passed.
+
+## Follow-up — Algorithm evaluation export
+- [x] Export saved formula evaluation history as staff CSV/JSON and include source metadata and experiment-only labeling.
+- [ ] Include this data in comprehensive research exports and cohort statistics; define retention/deletion behavior for orphaned evaluation rows.
+- [x] Delete session-linked formula evaluation rows when the source session is deleted or purged by patient-retention expiry.
+- [ ] Decide how manual evaluations without a session link are retained or cleared.
+- [x] Cascade session-linked formula evaluations with session soft-delete and patient-expiry cleanup; add expiry regression coverage.
+- [x] Escape spreadsheet formula-leading text in CSV exports and regression-test it.
+- [ ] Resolve intermittent Electron exit code `-2147483645` after fresh launch, capturing current stdout/stderr and Windows crash data; past DOM-ready logs do not establish stable repeat launches.
+
+## UI polish follow-up — 2026-10-22
+- [x] Add a persisted dark/light theme switch and persisted collapsible sidebar.
+- [x] Apply glass surfaces, ambient gradient and spectrum accents to the Electron/React UI; add reduced-motion styling.
+- [x] Rebuild bundled desktop UI and run existing frontend tests (4 passed; 141 Vite modules built).
+- [ ] Visually inspect the actual Electron window in both themes and expanded/collapsed layouts; verify readability, focus states, chart labels and compact-window behavior.
+- [ ] Refresh the existing Desktop transfer folder only after the source-root implementation and context notes are complete; verify checksums and exclude patient data, raw captures, caches and virtual environments.
+
+## UI defect follow-up — Windows native dropdown (2026-10-22)
+- [x] Fix unreadable dark-mode role options by explicitly styling native select options against their popup background.
+- [x] Re-run frontend tests (4 passed) and desktop TypeScript/Vite bundle (141 modules).
+- [ ] Confirm in an actual Windows Electron screenshot in both themes; replace native select with an accessible custom listbox only if native option styling is ignored.
+- [ ] Re-test patient workflow using a valid generated code; the screenshot's entered `O` correctly produced the no-profile state, so that state alone is not evidence of a workflow bug.
+
+## Responsiveness follow-up — 2026-10-22
+- [x] Remove repeated card/sidebar backdrop blur and decorative blur layers; reduce large shadows and chart filters.
+- [x] Avoid rerendering App/routes/charts on theme and sidebar toggles; update presentation preferences without React root state.
+- [x] Remove root background/width transitions; tests 4 passed and desktop bundle 141 modules built.
+- [ ] Measure perceived responsiveness and chart FPS in actual Electron with same-size repeated theme toggles and active simulator/device stream; record method and result before claiming FPS improvement.
+- [ ] If slow under active capture persists, profile polling cadence, waveform SVG point count and state-update scope separately; do not reduce sampling/storage fidelity to mask UI lag.

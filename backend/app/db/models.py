@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, Index, Integer, String, Text
 
 try:
     from .database import Base
@@ -108,6 +108,7 @@ class Patient(Base):
     full_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=True)
     chromosome_marker = Column(String, nullable=False)  # X=XX, Y=XY
+    reported_sex = Column(String, nullable=True)  # female/male; marker above is a code convention, not karyotype evidence
     age_band = Column(String, nullable=False)
     medical_history = Column(Text, nullable=True)
     family_history = Column(Text, nullable=True)
@@ -116,3 +117,33 @@ class Patient(Base):
     retention_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+
+class AlgorithmFormula(Base):
+    __tablename__ = "algorithm_formulas"
+    __table_args__ = (Index("ix_algorithm_formulas_name_version", "name", "version", unique=True),)
+
+    id = Column(String, primary_key=True)
+    version = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    expression = Column(Text, nullable=False)
+    tbr_min = Column(Float, nullable=False)
+    tbr_max = Column(Float, nullable=False)
+    status = Column(String, nullable=False, default="experimental")
+    change_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive)
+
+
+class AlgorithmEvaluation(Base):
+    __tablename__ = "algorithm_evaluations"
+
+    id = Column(String, primary_key=True)
+    formula_id = Column(String, nullable=False, index=True)
+    formula_version = Column(Integer, nullable=False)
+    session_id = Column(String, nullable=True, index=True)
+    tbr = Column(Float, nullable=True)
+    quality_status = Column(String, nullable=False)
+    npi_value = Column(Float, nullable=True)
+    parameters_snapshot = Column(Text, nullable=False)
+    source_metadata = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utcnow_naive)

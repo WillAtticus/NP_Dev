@@ -7,10 +7,10 @@ from pathlib import Path
 from sqlalchemy.orm import Session as DBSession
 
 try:
-    from ..db.models import AuditEvent, Patient, Session
+    from ..db.models import AlgorithmEvaluation, AuditEvent, Patient, Session
     from ..db.timeutils import utcnow_naive
 except ImportError:
-    from backend.app.db.models import AuditEvent, Patient, Session
+    from backend.app.db.models import AlgorithmEvaluation, AuditEvent, Patient, Session
     from backend.app.db.timeutils import utcnow_naive
 
 
@@ -56,6 +56,7 @@ def purge_expired_patient_data(db: DBSession, data_root: str | os.PathLike[str])
                     except OSError:
                         pass
             db.query(AuditEvent).filter(AuditEvent.session_id == session.id).delete(synchronize_session=False)
+            db.query(AlgorithmEvaluation).filter(AlgorithmEvaluation.session_id == session.id).delete(synchronize_session=False)
             db.delete(session)
 
         # The patient remains until an active session has finished; a later pass

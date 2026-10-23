@@ -1,5 +1,4 @@
 import os
-import tempfile
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,8 +10,8 @@ from backend.app.db.database import get_db as original_get_db
 from backend.app.db.models import LocalUser
 
 
-def test_local_auth_bootstrap_roles_deactivation_and_logout(monkeypatch):
-    temp_dir = tempfile.mkdtemp()
+def test_local_auth_bootstrap_roles_deactivation_and_logout(monkeypatch, local_test_dir):
+    temp_dir = local_test_dir
     engine = create_engine(f"sqlite:///{os.path.join(temp_dir, 'auth.db')}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     test_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -75,4 +74,3 @@ def test_local_auth_bootstrap_roles_deactivation_and_logout(monkeypatch):
         backend_main.app.dependency_overrides.clear()
         engine.dispose()
         import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)

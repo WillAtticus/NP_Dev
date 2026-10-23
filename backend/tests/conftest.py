@@ -1,8 +1,23 @@
 from types import SimpleNamespace
+import shutil
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from backend.app.main import app, current_local_user
+
+
+@pytest.fixture
+def local_test_dir():
+    """Create test artifacts inside the writable checkout, not the OS sandbox temp path."""
+    root = Path(__file__).resolve().parents[2] / ".test-tmp"
+    root.mkdir(exist_ok=True)
+    directory = tempfile.mkdtemp(dir=root)
+    try:
+        yield directory
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

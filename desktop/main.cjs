@@ -15,13 +15,19 @@ const appOrigin = 'neuropulse://app'
 // directory. A previous elevated launch can leave the default Roaming cache ACLs
 // owned by another token and make the desktop shell exit at startup.
 if (!app.isPackaged) {
-  app.setPath('userData', path.join(projectRoot, 'data', 'electron-user-data'))
+  const localElectronData = path.join(projectRoot, 'data', 'electron-user-data')
+  app.setPath('userData', localElectronData)
 }
 let backendProcess = null
 let backendLaunchError = null
 let ownsBackend = false
 let backendLogs = []
 let mainWindow = null
+const desktopLogPath = path.join(app.getPath('userData'), 'desktop.log')
+
+function logDesktop(message) {
+  fs.appendFile(desktopLogPath, `[${new Date().toISOString()}] ${message}\n`, () => {})
+}
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -136,6 +142,20 @@ function createWindow() {
     },
   })
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  mainWindow.webContents.on('dom-ready', () => logDesktop('Renderer DOM is ready.'))
+  mainWindow.webContents.on('did-finish-load', () => logDesktop('Renderer finished loading the application page.'))
+  mainWindow.webContents.on('console-message', (details) => {
+    if (details.level === 'error' || details.level === 'warning') {
+      logDesktop(`Renderer console ${details.level}: ${details.message} (${details.sourceId}:${details.lineNumber})`)
+    }
+  })
+  mainWindow.once('ready-to-show', () => logDesktop('Main window is ready to show.'))
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
+    logDesktop(`Renderer failed to load (${code}): ${description}; URL=${validatedURL}`)
+  })
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logDesktop(`Renderer process exited: ${JSON.stringify(details)}`)
+  })
   mainWindow.webContents.on('will-navigate', (event, target) => {
     try {
       if (new URL(target).origin !== appOrigin) event.preventDefault()
@@ -144,19 +164,29 @@ function createWindow() {
     }
   })
   mainWindow.on('closed', () => { mainWindow = null })
-  mainWindow.loadURL(`${appOrigin}/index.html`)
+  mainWindow.loadURL(`${appOrigin}/index.html`).catch((error) => {
+    logDesktop(`Window navigation failed: ${error.stack || error}`)
+  })
 }
 
 async function launch() {
+  logDesktop('Desktop app ready; beginning startup.')
   registerLocalUiProtocol()
   try {
     if (!fs.existsSync(path.join(uiRoot, 'index.html'))) {
       throw new Error('Desktop UI build is missing. Run npm run build:ui from the desktop folder.')
     }
-    if (!await hasBackendAlreadyRunning()) startBackend()
+    if (!await hasBackendAlreadyRunning()) {
+      logDesktop('No local API responded; starting the bundled project Python environment.')
+      startBackend()
+    } else {
+      logDesktop('Reusing an already-running local API.')
+    }
     await waitForBackend()
+    logDesktop('Local API health check passed; creating the desktop window.')
     createWindow()
   } catch (error) {
+    logDesktop(`Startup failed: ${error.stack || error}`)
     await dialog.showMessageBox({
       type: 'error',
       title: 'Không thể khởi động NeuroPulse',
@@ -171,10 +201,11 @@ app.whenReady().then(launch)
 
 app.on('window-all-closed', () => app.quit())
 app.on('before-quit', () => {
+  logDesktop('Desktop app is quitting.')
   if (ownsBackend && backendProcess && backendProcess.exitCode === null) backendProcess.kill()
   for (const stream of backendLogs) stream.end()
 })
 
 process.on('uncaughtException', (error) => {
-  fs.appendFile(path.join(app.getPath('userData'), 'desktop.log'), `${error.stack || error}\n`, () => {})
+  logDesktop(`Uncaught exception: ${error.stack || error}`)
 })

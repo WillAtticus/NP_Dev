@@ -25,6 +25,9 @@ QUALITY_REASONS = {
     "FLATLINE",
     "PACKET_CORRUPTION",
     "INSUFFICIENT_DATA",
+    "NON_FINITE_SAMPLES",
+    "SAMPLE_RATE_UNVERIFIED",
+    "INVALID_DEVICE_TIMESTAMPS",
 }
 
 
@@ -172,6 +175,10 @@ def quality_gate(
 ) -> Tuple[str, List[str]]:
     flags = list(pre_flags)
     thresholds = profile.get("quality_thresholds", {})
+    raw = np.asarray(raw, dtype=np.float64)
+    if raw.size and not np.all(np.isfinite(raw)):
+        flags.append("NON_FINITE_SAMPLES")
+        return QualityStatus.INVALID, flags
 
     # Insufficient data
     req_samples = int(profile["sample_rate_hz"] * profile["window_length_sec"])
@@ -191,11 +198,15 @@ def quality_gate(
             flags.append("ADC_CLIPPING")
 
     # Low signal RMS
-    rms = float(np.sqrt(np.mean(raw ** 2)))
+    # Use signal RMS after removing the sensor's DC bias (Piezo ADC midpoint,
+    # or the ADXL axis gravity component), rather than treating offset as motion.
+    centered = raw - np.mean(raw)
+    rms = float(np.sqrt(np.mean(centered ** 2)))
     if rms < thresholds.get("min_signal_rms", 0.5):
         flags.append("LOW_SIGNAL")
 
-    if any(f in ["ADC_CLIPPING", "FLATLINE", "PACKET_CORRUPTION"] for f in flags):
+    if any(f in ["ADC_CLIPPING", "FLATLINE", "PACKET_CORRUPTION", "SAMPLE_GAP",
+                 "NON_FINITE_SAMPLES", "SAMPLE_RATE_UNVERIFIED", "INVALID_DEVICE_TIMESTAMPS"] for f in flags):
         return QualityStatus.INVALID, flags
     if flags:
         return QualityStatus.WARNING, flags
@@ -224,6 +235,22 @@ def run_pipeline(
 
     # ── Quality gate (on raw data) ──────────────────────────────────────────
     quality_status, quality_flags = quality_gate(raw_samples, profile, pre_flags)
+    nyquist = float(fs) / 2.0 if np.isfinite(fs) else 0.0
+    required_high = max(
+        float(bp_cfg["high_hz"]),
+        float(max(band[1] for band in bands.values())),
+    )
+    if fs <= 0 or required_high >= nyquist:
+        invalid_flags = list(quality_flags)
+        invalid_flags.append("INVALID_SAMPLE_RATE")
+        return {
+            "quality_status": QualityStatus.INVALID,
+            "quality_flags": list(dict.fromkeys(invalid_flags)),
+            "sample_count": int(np.asarray(raw_samples).size),
+            "sample_rate_hz": fs,
+            "tbr": None,
+            "npi": None,
+        }
     if quality_status == QualityStatus.INSUFFICIENT_DATA:
         raw_array = np.asarray(raw_samples)
         stride = max(1, int(np.ceil(len(raw_array) / 2000)))
@@ -237,6 +264,19 @@ def run_pipeline(
             "raw_signal_preview_stride": stride,
             "sample_count": int(len(raw_array)),
             "tbr": None, "npi": None,
+        }
+    if "NON_FINITE_SAMPLES" in quality_flags:
+        raw_array = np.asarray(raw_samples, dtype=np.float64)
+        finite_preview = raw_array[np.isfinite(raw_array)]
+        stride = max(1, int(np.ceil(len(finite_preview) / 2000)))
+        return {
+            "quality_status": quality_status,
+            "quality_flags": quality_flags,
+            "raw_signal_preview": finite_preview[::stride].tolist(),
+            "raw_signal_preview_stride": stride,
+            "sample_count": int(raw_array.size),
+            "tbr": None,
+            "npi": None,
         }
 
     # ── Detrend ─────────────────────────────────────────────────────────────
@@ -268,7 +308,8 @@ def run_pipeline(
     tbr = p_tremor / p_ref if p_ref > 0 else None
 
     # ── Signal features ──────────────────────────────────────────────────────
-    rms              = float(np.sqrt(np.mean(raw_samples ** 2)))
+    centered_samples = raw_samples - np.mean(raw_samples)
+    rms              = float(np.sqrt(np.mean(centered_samples ** 2)))
     peak_to_peak     = float(np.ptp(raw_samples))
     mean_val         = float(np.mean(raw_samples))
     std_val          = float(np.std(raw_samples))

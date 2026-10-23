@@ -134,7 +134,8 @@ class StudyResponse(BaseModel):
 class PatientCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=160)
     date_of_birth: Optional[date] = None
-    chromosome_marker: Literal["X", "Y"]
+    reported_sex: Optional[Literal["female", "male"]] = None
+    chromosome_marker: Optional[Literal["X", "Y"]] = None  # legacy clients; mapped from reported sex when provided
     medical_history: Optional[str] = Field(default=None, max_length=4000)
     family_history: Optional[str] = Field(default=None, max_length=4000)
     diet: Optional[Literal["vegetarian", "omnivore"]] = None
@@ -148,6 +149,7 @@ class PatientResponse(BaseModel):
     full_name: str
     date_of_birth: Optional[date] = None
     chromosome_marker: str
+    reported_sex: Optional[str] = None
     age_band: str
     medical_history: Optional[str] = None
     family_history: Optional[str] = None

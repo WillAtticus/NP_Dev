@@ -48,6 +48,7 @@ class AcquisitionManager:
         self.current_port = "SIMULATOR"
         self.baud_rate = 115200
         self.simulator_profile = "healthy"
+        self.analysis_channel: Optional[str] = None
 
         # Physical serial handle
         self._serial_handle = None
@@ -74,6 +75,7 @@ class AcquisitionManager:
         self.total_samples_received = 0
         self.packet_crc_errors = 0
         self.malformed_packets = 0
+        self.timestamp_errors = 0
         self.sequence_gaps = 0
         self.last_seq_num: Optional[int] = None
         self.start_stream_time: Optional[float] = None
@@ -221,7 +223,9 @@ class AcquisitionManager:
         self.sequence_gaps = 0
         self.packet_crc_errors = 0
         self.malformed_packets = 0
+        self.timestamp_errors = 0
         self.last_seq_num = None
+        self.last_reader_error = None
         self.effective_sample_rate = 0.0
         self.sample_timing_status = "AWAITING_DEVICE_TIMESTAMPS" if not self.is_simulated else "SIMULATED_CONFIGURED"
         self.sample_rate_source = None
@@ -229,6 +233,9 @@ class AcquisitionManager:
         self._last_packet_timestamp_us = None
         self._rate_anchor_timestamp_us = None
         self._rate_anchor_sequence = None
+        # Live analysis must never carry samples over from a previous session.
+        for channel_buffer in self.live_channels.values():
+            channel_buffer.clear()
 
         # Reset session storage if recording
         self.active_session_id = session_id
@@ -337,6 +344,9 @@ class AcquisitionManager:
             "timestamp_start_monotonic_us": self.session_start_monotonic_us,
             "total_samples": self.total_samples_received,
             "sequence_gaps": self.sequence_gaps,
+            "packet_crc_errors": self.packet_crc_errors,
+            "malformed_packets": self.malformed_packets,
+            "timestamp_errors": self.timestamp_errors,
             "simulator_profile": self.simulator_profile if self.is_simulated else None,
             "simulator_parameters": ({
                 "tremor_freq_hz": self._simulator.tremor_freq_hz,
@@ -370,6 +380,9 @@ class AcquisitionManager:
                     h5f.attrs["timestamp_start_monotonic_us"] = int(self.session_start_monotonic_us)
                     h5f.attrs["total_samples"] = int(self.total_samples_received)
                     h5f.attrs["sequence_gaps"] = int(self.sequence_gaps)
+                    h5f.attrs["packet_crc_errors"] = int(self.packet_crc_errors)
+                    h5f.attrs["malformed_packets"] = int(self.malformed_packets)
+                    h5f.attrs["timestamp_errors"] = int(self.timestamp_errors)
                     if self.is_simulated and self._simulator:
                         h5f.attrs["simulator_profile"] = self.simulator_profile
                         h5f.attrs["simulator_parameters_json"] = json.dumps(payload["simulator_parameters"], sort_keys=True)
@@ -435,15 +448,22 @@ class AcquisitionManager:
                             buffer = buffer[total_len:]
                             packet, err = NeuroPulsePacket.decode(frame)
                             if packet:
+                                if packet.proto_ver != 1:
+                                    self.malformed_packets += 1
+                                    continue
                                 expected_type = 0x03 if self.selected_sensor == "ADXL345" else 0x02
                                 if packet.msg_type == expected_type:
                                     expected_alignment = 6 if expected_type == 0x03 else 2
-                                    if len(packet.payload) % expected_alignment == 0:
+                                    if packet.payload and len(packet.payload) % expected_alignment == 0:
                                         self._ingest_packet(packet)
                                     else:
                                         self.malformed_packets += 1
-                            else:
+                                elif packet.msg_type in (0x02, 0x03):
+                                    self.malformed_packets += 1
+                            elif err and "CRC mismatch" in err:
                                 self.packet_crc_errors += 1
+                            else:
+                                self.malformed_packets += 1
                         else:
                             # Discard byte to search for sync
                             buffer.pop(0)
@@ -454,15 +474,23 @@ class AcquisitionManager:
                     self._serial_handle.write(b"STOP_STREAM\n")
                 except Exception:
                     pass
+        except Exception as exc:
+            # Keep the session stoppable so samples already received can be finalized.
+            self.last_reader_error = f"Serial acquisition failed: {exc}"
 
     def _ingest_packet(self, packet: NeuroPulsePacket):
-        self.total_packets_received += 1
         previous_sequence = self.last_seq_num
         previous_timestamp_us = self._last_packet_timestamp_us
         if self.last_seq_num is not None:
             sequence_delta = (packet.seq_num - self.last_seq_num) & 0xFFFFFFFF
+            # Sequence numbers are per packet. Reject duplicate or stale frames;
+            # appending them would distort timing and spectral energy.
+            if sequence_delta == 0 or sequence_delta >= 0x80000000:
+                self.malformed_packets += 1
+                return
             if sequence_delta > 1:
                 self.sequence_gaps += sequence_delta - 1
+        self.total_packets_received += 1
         self.last_seq_num = packet.seq_num
 
         adapter = self.piezo_adapter if self.selected_sensor == "PIEZO_LDT0_028K" else self.adxl_adapter
@@ -494,6 +522,7 @@ class AcquisitionManager:
             self.sample_timing_status = "AWAITING_DEVICE_TIMESTAMPS"
             self.sample_rate_source = "device_monotonic_timestamps_and_sequence"
         elif packet.timestamp_us <= previous_timestamp_us:
+            self.timestamp_errors += 1
             self.effective_sample_rate = 0.0
             self.sample_timing_status = "INVALID_DEVICE_TIMESTAMPS"
             self.sample_rate_source = None
@@ -542,6 +571,8 @@ class AcquisitionManager:
                 pass
 
     def get_status(self) -> Dict[str, Any]:
+        elapsed_sec = (max(0.0, time.perf_counter() - self.start_stream_time)
+                       if self.is_streaming and self.start_stream_time is not None else 0.0)
         return {
             "is_connected": self.is_connected,
             "is_streaming": self.is_streaming,
@@ -560,5 +591,6 @@ class AcquisitionManager:
             "crc_errors": self.packet_crc_errors,
             "malformed_packets": self.malformed_packets,
             "active_session_id": self.active_session_id,
+            "elapsed_sec": round(elapsed_sec, 1),
             "last_reader_error": self.last_reader_error,
         }

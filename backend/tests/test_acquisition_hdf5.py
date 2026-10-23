@@ -1,19 +1,20 @@
 import os
 import shutil
-import tempfile
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import pytest
 import h5py
 import numpy as np
+from starlette.requests import Request
 
 from backend.app.services.acquisition.manager import AcquisitionManager
-from backend.app.main import app
+from backend.app.main import app, RunAnalysisRequest
+from backend.app.db.models import LocalUser
 from fastapi.testclient import TestClient
 
-def test_hdf5_storage_and_analysis():
-    temp_dir = tempfile.mkdtemp()
+def test_hdf5_storage_and_analysis(local_test_dir):
+    temp_dir = local_test_dir
     try:
         manager = AcquisitionManager(data_root=temp_dir)
         manager.is_simulated = True
@@ -76,14 +77,14 @@ def test_hdf5_storage_and_analysis():
         finally:
             backend_main.DATA_ROOT = orig_data_root
     finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        pass
 
 
-def test_simulated_acquisition_creates_and_finalizes_session(monkeypatch):
+def test_simulated_acquisition_creates_and_finalizes_session(monkeypatch, local_test_dir):
     from backend.app import main as backend_main
     from backend.app.db.database import Base
 
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = local_test_dir
     engine = create_engine(f"sqlite:///{os.path.join(temp_dir, 'test.db')}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     test_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -123,8 +124,69 @@ def test_simulated_acquisition_creates_and_finalizes_session(monkeypatch):
         assert payload["session"]["provenance"] == "simulated"
         assert payload["session"]["raw_data_path"]
         assert payload["session"]["sha256_hash"]
+        assert "finalization_error" not in payload
+        assert payload["analysis"]["quality_status"] == "INSUFFICIENT_DATA"
         assert os.path.exists(os.path.join(temp_dir, "sessions", session_id, "raw.h5"))
         assert client.get(f"/api/v1/sessions/{session_id}").json()["sample_count"] > 0
     finally:
         engine.dispose()
-        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_device_record_without_measured_rate_does_not_use_profile_default(monkeypatch, local_test_dir):
+    from backend.app import main as backend_main
+
+    session_id = "device-rate-unverified"
+    session_dir = os.path.join(local_test_dir, "sessions", session_id)
+    os.makedirs(session_dir)
+    with h5py.File(os.path.join(session_dir, "raw.h5"), "w") as h5f:
+        h5f.attrs["sensor_type"] = "PIEZO_LDT0_028K"
+        h5f.attrs["provenance"] = "device"
+        h5f.attrs["sample_timing_status"] = "AWAITING_DEVICE_TIMESTAMPS"
+        channels = h5f.create_group("channels")
+        channels.create_dataset("raw_counts", data=np.full(8000, 2048, dtype=np.float32))
+
+    monkeypatch.setattr(backend_main, "_session_data_dir", lambda _session_id: session_dir)
+    request = Request({"type": "http", "headers": [], "client": ("127.0.0.1", 1234)})
+    user = LocalUser(id="test-admin", username="test-admin", password_hash="", role="admin", is_active=True)
+    result = backend_main.analyse_session(
+        RunAnalysisRequest(session_id=session_id, profile_id="piezo_butterworth_1_20_default"),
+        request=request,
+        user=user,
+    )
+
+    analysis = result["analysis"]
+    assert analysis["quality_status"] == "INSUFFICIENT_DATA"
+    assert "SAMPLE_RATE_UNVERIFIED" in analysis["quality_flags"]
+    assert analysis["sample_rate_hz"] is None
+    assert analysis["npi"]["npi_value"] is None
+
+
+def test_persisted_packet_loss_suppresses_reanalysis_npi(monkeypatch, local_test_dir):
+    from backend.app import main as backend_main
+
+    session_id = "device-record-with-gap"
+    session_dir = os.path.join(local_test_dir, "sessions", session_id)
+    os.makedirs(session_dir)
+    samples = 2048.0 + 100.0 * np.sin(2 * np.pi * 5 * np.arange(8000) / 1000.0)
+    with h5py.File(os.path.join(session_dir, "raw.h5"), "w") as h5f:
+        h5f.attrs["sensor_type"] = "PIEZO_LDT0_028K"
+        h5f.attrs["provenance"] = "device"
+        h5f.attrs["sample_rate_hz"] = 1000.0
+        h5f.attrs["sequence_gaps"] = 1
+        h5f.attrs["packet_crc_errors"] = 0
+        h5f.attrs["malformed_packets"] = 0
+        channels = h5f.create_group("channels")
+        channels.create_dataset("raw_counts", data=samples.astype(np.float32))
+
+    monkeypatch.setattr(backend_main, "_session_data_dir", lambda _session_id: session_dir)
+    request = Request({"type": "http", "headers": [], "client": ("127.0.0.1", 1234)})
+    user = LocalUser(id="test-admin", username="test-admin", password_hash="", role="admin", is_active=True)
+    result = backend_main.analyse_session(
+        RunAnalysisRequest(session_id=session_id, profile_id="piezo_butterworth_1_20_default"),
+        request=request,
+        user=user,
+    )
+    analysis = result["analysis"]
+    assert analysis["quality_status"] == "INVALID"
+    assert "SAMPLE_GAP" in analysis["quality_flags"]
+    assert analysis["npi"]["npi_value"] is None

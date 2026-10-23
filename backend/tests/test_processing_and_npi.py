@@ -89,6 +89,35 @@ class TestQualityGate:
         result = run_pipeline(clipped_heavy, PROFILE_PIEZO_1_20)
         assert "ADC_CLIPPING" in result["quality_flags"]
 
+    def test_packet_loss_invalidates_analysis_and_suppresses_npi(self):
+        signal = make_sine_signal(5.0)
+        result = run_pipeline(signal, PROFILE_PIEZO_1_20, pre_quality_flags=["SAMPLE_GAP"])
+        npi = run_npi(result.get("tbr"), quality_status=result["quality_status"])
+        assert result["quality_status"] == QualityStatus.INVALID
+        assert "SAMPLE_GAP" in result["quality_flags"]
+        assert npi["npi_value"] is None
+
+    def test_non_finite_samples_are_rejected_without_filter_crash(self):
+        signal = make_sine_signal(5.0)
+        signal[100] = np.nan
+        result = run_pipeline(signal, PROFILE_PIEZO_1_20)
+        assert result["quality_status"] == QualityStatus.INVALID
+        assert "NON_FINITE_SAMPLES" in result["quality_flags"]
+        assert result["tbr"] is None
+
+    def test_low_signal_gate_uses_ac_component_not_adc_midpoint(self):
+        quiet = 2048.0 + 0.1 * np.sin(2 * np.pi * 5 * np.arange(N) / FS_PIEZO)
+        result = run_pipeline(quiet, PROFILE_PIEZO_1_20)
+        assert "LOW_SIGNAL" in result["quality_flags"]
+        assert result["rms"] < 0.5
+
+    def test_invalid_sample_rate_is_rejected_before_filter_design(self):
+        profile = {**PROFILE_PIEZO_1_20, "sample_rate_hz": 30.0}
+        result = run_pipeline(make_sine_signal(5.0), profile)
+        assert result["quality_status"] == QualityStatus.INVALID
+        assert "INVALID_SAMPLE_RATE" in result["quality_flags"]
+        assert result["tbr"] is None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. NPI formula tests

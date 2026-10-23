@@ -5,14 +5,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 
 try:
-    from .models import AuditEvent, Device, Session, Study
+    from .models import AlgorithmEvaluation, AuditEvent, Device, Session, Study
     from .timeutils import utcnow_naive
 except ImportError:
     try:
-        from app.db.models import AuditEvent, Device, Session, Study
+        from app.db.models import AlgorithmEvaluation, AuditEvent, Device, Session, Study
         from app.db.timeutils import utcnow_naive
     except ImportError:
-        from backend.app.db.models import AuditEvent, Device, Session, Study
+        from backend.app.db.models import AlgorithmEvaluation, AuditEvent, Device, Session, Study
         from backend.app.db.timeutils import utcnow_naive
 
 
@@ -113,6 +113,8 @@ def soft_delete_session(
     session = db.query(Session).filter(Session.id == session_id).first()
     if not session:
         return False
+    # Evaluation results cannot remain linked to a session after its deletion.
+    db.query(AlgorithmEvaluation).filter(AlgorithmEvaluation.session_id == session_id).delete(synchronize_session=False)
     session.is_deleted = True
     session.updated_at = utcnow_naive()
     db.commit()

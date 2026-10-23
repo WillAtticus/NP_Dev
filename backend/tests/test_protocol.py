@@ -14,6 +14,7 @@ from shared.schemas.protocol import (
     decode_adxl_payload,
     compute_crc16_ccitt,
 )
+from backend.app.services.acquisition.manager import AcquisitionManager
 
 def test_piezo_packet_roundtrip():
     samples = [2048, 2100, 1950, 2040, 2060]
@@ -75,6 +76,29 @@ def test_corrupted_crc_detection():
 
     assert decoded is None
     assert "CRC mismatch" in err
+
+
+def test_duplicate_and_stale_data_packets_are_rejected_before_storage():
+    manager = AcquisitionManager(data_root=".")
+    manager.is_simulated = False
+    manager.selected_sensor = "PIEZO_LDT0_028K"
+    manager._ingest_packet(NeuroPulsePacket(
+        msg_type=MSG_TYPE_DATA_PIEZO, seq_num=7, timestamp_us=1_000_000,
+        payload=encode_piezo_payload([2048, 2050]),
+    ))
+    manager._ingest_packet(NeuroPulsePacket(
+        msg_type=MSG_TYPE_DATA_PIEZO, seq_num=7, timestamp_us=1_002_000,
+        payload=encode_piezo_payload([2049, 2051]),
+    ))
+    manager._ingest_packet(NeuroPulsePacket(
+        msg_type=MSG_TYPE_DATA_PIEZO, seq_num=6, timestamp_us=1_003_000,
+        payload=encode_piezo_payload([2047, 2052]),
+    ))
+
+    assert manager.total_packets_received == 1
+    assert manager.total_samples_received == 2
+    assert list(manager.live_channels["raw_counts"]) == [2048.0, 2050.0]
+    assert manager.malformed_packets == 2
 
 if __name__ == "__main__":
     test_piezo_packet_roundtrip()

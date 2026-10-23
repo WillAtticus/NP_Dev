@@ -24,10 +24,10 @@ def test_empty_database_migrates_and_upgrade_is_repeatable(migration_engine):
     tables = set(inspect(migration_engine).get_table_names())
     assert {
         "sessions", "devices", "studies", "audit_events", "local_users",
-        "auth_sessions", "patients", "alembic_version",
+        "auth_sessions", "patients", "algorithm_formulas", "algorithm_evaluations", "alembic_version",
     } <= tables
     with migration_engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_patients"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0005_algorithm_evaluations"
         differences = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     assert differences == []
 
@@ -45,7 +45,7 @@ def test_unversioned_current_schema_is_adopted_without_losing_rows(migration_eng
     with migration_engine.connect() as connection:
         row = connection.execute(text("SELECT id FROM sessions")).one()
         assert row.id == "existing-session"
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_patients"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0005_algorithm_evaluations"
     assert "local_users" in inspect(migration_engine).get_table_names()
 
 
